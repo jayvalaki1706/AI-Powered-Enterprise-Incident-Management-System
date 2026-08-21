@@ -1,0 +1,103 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  BACKEND_IMAGE: incident-management-backend
+  FRONTEND_IMAGE: incident-management-frontend
+
+jobs:
+  # ─── Run CI first ──────────────────────────────────────────────────────────────
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # ─── Build & Push to ECR ────────────────────────────────────────────────────────
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: ci
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
+
+  # ─── Deploy to EC2 ──────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /opt/incident-management
+
+            # Pull latest images
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+
+            # Update docker-compose with new image tags
+            export BACKEND_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}"
+            export FRONTEND_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}"
+
+            # Pull new images and restart
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+            # Run migrations
+            docker compose exec -T backend alembic upgrade head
+
+            # Health check
+            sleep 10
+            curl -f http://localhost:8000/health || exit 1
+
+            echo "✅ Deployment successful!"
+
+      - name: Notify on success
+        if: success()
+        run: echo "Deployment to production completed successfully"
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "⚠️ Deployment failed! Check logs."
