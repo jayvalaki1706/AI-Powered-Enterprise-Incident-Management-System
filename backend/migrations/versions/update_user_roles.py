@@ -16,14 +16,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Add new enum values to the existing userrole type
+    op.execute("COMMIT")  # Commit current transaction so new enum values are available
     op.execute("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'INCIDENT_MANAGER'")
     op.execute("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'TEAM_LEAD'")
 
-    # Migrate existing 'MANAGER' users to 'INCIDENT_MANAGER'
-    op.execute("UPDATE users SET role = 'INCIDENT_MANAGER' WHERE role = 'MANAGER'")
-
 
 def downgrade() -> None:
-    # Revert INCIDENT_MANAGER back to MANAGER
-    op.execute("UPDATE users SET role = 'MANAGER' WHERE role = 'INCIDENT_MANAGER'")
-    op.execute("UPDATE users SET role = 'MANAGER' WHERE role = 'TEAM_LEAD'")
+    pass  # Cannot remove enum values in PostgreSQL
