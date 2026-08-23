@@ -23,9 +23,21 @@ from app.models.incident import IncidentStatus, IncidentPriority
 
 
 async def _invalidate_analytics_cache(redis_client: aioredis.Redis | None):
-    """Clear analytics dashboard cache so new data is reflected immediately."""
-    if redis_client:
-        await redis_client.delete("analytics:dashboard", "analytics:sla")
+    """Clear all analytics caches so new data is reflected immediately."""
+    if not redis_client:
+        return
+    try:
+        await redis_client.delete("analytics:dashboard:global", "analytics:sla")
+        # Clear all user-specific dashboard caches
+        cursor = 0
+        while True:
+            cursor, keys = await redis_client.scan(cursor, match="analytics:dashboard:*", count=100)
+            if keys:
+                await redis_client.delete(*keys)
+            if cursor == 0:
+                break
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
 

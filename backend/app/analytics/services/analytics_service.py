@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 import redis.asyncio as aioredis
+import json
 
 from app.analytics.repositories.analytics_repository import AnalyticsRepository
 from app.analytics.schemas import (
@@ -14,18 +15,49 @@ from app.analytics.schemas import (
 
 
 class AnalyticsService:
-    """Business logic for analytics with optional Redis caching."""
+    """Business logic for analytics with Redis caching for production performance."""
 
     def __init__(self, db: AsyncSession, redis_client: aioredis.Redis | None = None):
         self.repository = AnalyticsRepository(db)
         self.redis = redis_client
-        self.cache_ttl = 300  # 5 minutes
+        self.cache_ttl = 30  # 30 seconds — short enough for near-real-time, long enough to handle bursts
+
+    # ─── Cache Helpers ──────────────────────────────────────────────────────────
+
+    async def _get_cached(self, key: str):
+        """Get data from Redis cache. Returns None on miss or if Redis unavailable."""
+        if not self.redis:
+            return None
+        try:
+            data = await self.redis.get(key)
+            if data:
+                return json.loads(data)
+        except Exception:
+            pass
+        return None
+
+    async def _set_cached(self, key: str, data, ttl: int = None):
+        """Set data in Redis cache. Fails silently if Redis unavailable."""
+        if not self.redis:
+            return
+        try:
+            await self.redis.set(key, json.dumps(data), ex=ttl or self.cache_ttl)
+        except Exception:
+            pass
 
     # ─── Dashboard ──────────────────────────────────────────────────────────────
 
     async def get_dashboard(self, user_id=None) -> DashboardResponse:
-        """Get full dashboard data (always fresh from DB)."""
-        # Fetch from DB directly — no caching for real-time accuracy
+        """Get dashboard data with Redis caching (30s TTL, invalidated on changes)."""
+        # Build cache key (different per user for customer isolation)
+        cache_key = f"analytics:dashboard:{user_id or 'global'}"
+
+        # Try cache first
+        cached = await self._get_cached(cache_key)
+        if cached:
+            return DashboardResponse(**cached)
+
+        # Cache miss — query DB
         counts = await self.repository.get_incident_counts(user_id=user_id)
         avg_resolution = await self.repository.get_avg_resolution_time(user_id=user_id)
         resolved_today = await self.repository.get_resolved_today(user_id=user_id)
@@ -83,13 +115,18 @@ class AnalyticsService:
             for t in teams
         ]
 
-        return DashboardResponse(
+        response = DashboardResponse(
             stats=stats,
             priority_breakdown=priority_breakdown,
             monthly_trends=monthly_trends,
             top_engineers=top_engineers,
             top_teams=top_teams,
         )
+
+        # Store in cache (30s TTL)
+        await self._set_cached(cache_key, response.model_dump())
+
+        return response
 
     # ─── Individual Metrics ─────────────────────────────────────────────────────
 
@@ -114,9 +151,16 @@ class AnalyticsService:
         )
 
     async def get_sla_compliance(self) -> SLAComplianceResponse:
-        """Get SLA compliance data."""
+        """Get SLA compliance data (cached 30s)."""
+        cache_key = "analytics:sla"
+        cached = await self._get_cached(cache_key)
+        if cached:
+            return SLAComplianceResponse(**cached)
+
         data = await self.repository.get_sla_compliance()
-        return SLAComplianceResponse(**data)
+        response = SLAComplianceResponse(**data)
+        await self._set_cached(cache_key, response.model_dump())
+        return response
 
     async def get_engineer_performance(self, limit: int = 10) -> list[EngineerPerformance]:
         """Get engineer performance rankings."""
@@ -152,6 +196,20 @@ class AnalyticsService:
     # ─── Cache Invalidation ─────────────────────────────────────────────────────
 
     async def invalidate_cache(self) -> None:
-        """Clear analytics cache (call after data changes)."""
-        if self.redis:
-            await self.redis.delete("analytics:dashboard", "analytics:sla")
+        """Clear all analytics caches (called after incident changes).
+        Uses key pattern to clear all user-specific dashboard caches."""
+        if not self.redis:
+            return
+        try:
+            # Delete global and SLA caches
+            await self.redis.delete("analytics:dashboard:global", "analytics:sla")
+            # Delete all user-specific dashboard caches using scan
+            cursor = 0
+            while True:
+                cursor, keys = await self.redis.scan(cursor, match="analytics:dashboard:*", count=100)
+                if keys:
+                    await self.redis.delete(*keys)
+                if cursor == 0:
+                    break
+        except Exception:
+            pass  # Cache invalidation failure is non-critical
