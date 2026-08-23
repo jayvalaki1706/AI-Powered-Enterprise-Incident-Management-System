@@ -17,20 +17,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.execute("""
-        CREATE TYPE aiinteractiontype AS ENUM (
-            'chat', 'log_analysis', 'suggest_fix', 'generate_sop', 'generate_rca', 'summarize'
+        DO $$ BEGIN
+            CREATE TYPE aiinteractiontype AS ENUM (
+                'chat', 'log_analysis', 'suggest_fix', 'generate_sop', 'generate_rca', 'summarize'
+            );
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS ai_interactions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            incident_id UUID NOT NULL REFERENCES incidents(id),
+            user_id UUID NOT NULL REFERENCES users(id),
+            interaction_type aiinteractiontype NOT NULL,
+            input_text TEXT NOT NULL,
+            output_text TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
         )
     """)
-    op.create_table(
-        "ai_interactions",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("incident_id", UUID(as_uuid=True), sa.ForeignKey("incidents.id"), nullable=False, index=True),
-        sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("interaction_type", sa.Enum("chat", "log_analysis", "suggest_fix", "generate_sop", "generate_rca", "summarize", name="aiinteractiontype"), nullable=False),
-        sa.Column("input_text", sa.Text, nullable=False),
-        sa.Column("output_text", sa.Text, nullable=False),
-        sa.Column("created_at", sa.DateTime, server_default=sa.func.now()),
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS idx_ai_interactions_incident ON ai_interactions(incident_id)")
 
 
 def downgrade() -> None:
