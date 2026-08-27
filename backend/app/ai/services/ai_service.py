@@ -124,6 +124,9 @@ Respond ONLY with this exact JSON structure (no other text):
             [f"- {c.content}" for c in comments[:15]]
         ) if comments else "No comments yet."
 
+        # Get attachment content (text, PDF, DOCX)
+        attachments_text = await self._get_attachments_context(incident_id)
+
         prompt = f"""You are analyzing a production incident. Provide a thorough resolution plan with specific, actionable steps.
 
 **Title:** {incident.title}
@@ -135,7 +138,10 @@ Respond ONLY with this exact JSON structure (no other text):
 **Comments/Updates:**
 {comments_text}
 
-IMPORTANT: Be specific and technical. Include exact commands, queries, config changes, and tools to use. Don't give generic advice — give steps an engineer can execute immediately.
+**Attached Files:**
+{attachments_text}
+
+IMPORTANT: Be specific and technical. Include exact commands, queries, config changes, and tools to use. Don't give generic advice — give steps an engineer can execute immediately. Reference any attached documents or logs in your analysis.
 
 Respond ONLY with this exact JSON structure (no other text):
 {{
@@ -147,9 +153,13 @@ Respond ONLY with this exact JSON structure (no other text):
     "confidence": 0.85
 }}"""
 
+        # Get images for vision analysis
+        images = await self._get_incident_images(incident_id) if AI_PROVIDER == "bedrock" else None
+
         result = await self._call_ollama(
             system_prompt=SYSTEM_PROMPTS["resolution"],
             user_prompt=prompt,
+            images=images,
         )
 
         return ResolutionResponse(**result)
@@ -170,6 +180,9 @@ Respond ONLY with this exact JSON structure (no other text):
             [f"- {c.content}" for c in comments[:10]]
         ) if comments else "No comments."
 
+        # Get attachment content
+        attachments_text = await self._get_attachments_context(incident_id)
+
         prompt = f"""Based on this incident, create a detailed, production-ready Standard Operating Procedure (SOP) that any engineer can follow step-by-step to diagnose and resolve similar incidents.
 
 **Incident Title:** {incident.title}
@@ -179,6 +192,9 @@ Respond ONLY with this exact JSON structure (no other text):
 
 **Comments/Findings:**
 {comments_text}
+
+**Attached Files:**
+{attachments_text}
 
 IMPORTANT GUIDELINES:
 - Include 6-10 detailed steps minimum
@@ -207,9 +223,13 @@ Respond ONLY with this exact JSON structure (no other text):
     "notes": "Important warnings, common pitfalls, and tips from past incidents"
 }}"""
 
+        # Get images for vision analysis
+        images = await self._get_incident_images(incident_id) if AI_PROVIDER == "bedrock" else None
+
         result = await self._call_ollama(
             system_prompt=SYSTEM_PROMPTS["sop"],
             user_prompt=prompt,
+            images=images,
         )
 
         return SOPResponse(**result)
@@ -236,6 +256,9 @@ Respond ONLY with this exact JSON structure (no other text):
             [f"- [{h.created_at.strftime('%H:%M')}] {h.field_changed}: {h.old_value} → {h.new_value}" for h in history[:10]]
         ) if history else "No changes recorded."
 
+        # Get attachment content
+        attachments_text = await self._get_attachments_context(incident_id)
+
         prompt = f"""Perform a thorough Root Cause Analysis (RCA) for this production incident. Use the 5-Whys technique to drill down to the fundamental root cause. Be specific and technical.
 
 **Title:** {incident.title}
@@ -250,6 +273,9 @@ Respond ONLY with this exact JSON structure (no other text):
 
 **Engineer Comments/Findings:**
 {comments_text}
+
+**Attached Files:**
+{attachments_text}
 
 IMPORTANT: 
 - Each "why" should dig deeper than the previous one
@@ -278,9 +304,13 @@ Respond ONLY with this exact JSON structure (no other text):
     "lessons_learned": ["Key insight 1 for the team", "Key insight 2", "Key insight 3"]
 }}"""
 
+        # Get images for vision analysis
+        images = await self._get_incident_images(incident_id) if AI_PROVIDER == "bedrock" else None
+
         result = await self._call_ollama(
             system_prompt=SYSTEM_PROMPTS["rca"],
             user_prompt=prompt,
+            images=images,
         )
 
         return RCAResponse(**result)
@@ -301,12 +331,23 @@ Respond ONLY with this exact JSON structure (no other text):
         if incident_id:
             incident = await self.incident_repo.get_by_id(incident_id)
             if incident:
+                # Get comments
+                comments = await self.incident_repo.get_comments(incident_id)
+                comments_text = "\n".join(
+                    [f"- {c.content}" for c in comments[:10]]
+                ) if comments else "No comments."
+
+                # Get attachments info
+                attachments_text = await self._get_attachments_context(incident_id)
+
                 incident_context = (
                     f"Incident: {incident.title}\n"
                     f"Description: {incident.description}\n"
                     f"Priority: {incident.priority.value}\n"
                     f"Status: {incident.status.value}\n"
-                    f"Escalation: Level {incident.escalation_level}"
+                    f"Escalation: Level {incident.escalation_level}\n"
+                    f"\nComments:\n{comments_text}\n"
+                    f"\nAttachments:\n{attachments_text}"
                 )
 
         # Build context
@@ -331,9 +372,12 @@ Respond ONLY with this exact JSON structure (no other text):
         else:
             full_prompt = f"{message}\n\nRespond directly. Do not repeat the question."
 
-        # Call AI (unified)
+        # Call AI (unified) — include images if available
         try:
-            ai_response = await self._call_ai_chat(system, full_prompt)
+            images = None
+            if incident_id and AI_PROVIDER == "bedrock":
+                images = await self._get_incident_images(incident_id)
+            ai_response = await self._call_ai_chat(system, full_prompt, images=images)
         except Exception as e:
             logger.error(f"AI chat error: {e}")
             raise HTTPException(
@@ -405,19 +449,20 @@ Respond ONLY with this exact JSON structure (no other text):
         system_prompt: str,
         user_prompt: str,
         temperature: float = 0.3,
+        images: list[dict] | None = None,
     ) -> dict:
         """Route to the configured AI provider for structured JSON output."""
         if AI_PROVIDER == "bedrock":
-            return await self._call_bedrock_json(system_prompt, user_prompt, temperature)
+            return await self._call_bedrock_json(system_prompt, user_prompt, temperature, images=images)
         else:
             return await self._call_ollama_json(system_prompt, user_prompt, temperature)
 
     # ─── Private: Chat Call (plain text) ────────────────────────────────────────
 
-    async def _call_ai_chat(self, system_prompt: str, user_prompt: str) -> str:
+    async def _call_ai_chat(self, system_prompt: str, user_prompt: str, images: list[dict] | None = None) -> str:
         """Route to the configured AI provider for plain text chat."""
         if AI_PROVIDER == "bedrock":
-            return await self._call_bedrock_chat(system_prompt, user_prompt)
+            return await self._call_bedrock_chat(system_prompt, user_prompt, images=images)
         else:
             return await self._call_ollama_chat(system_prompt, user_prompt)
 
@@ -474,6 +519,141 @@ Respond ONLY with this exact JSON structure (no other text):
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"AI service error: {str(e)}",
             )
+
+    async def _get_incident_images(self, incident_id: UUID) -> list[dict] | None:
+        """Fetch images attached to an incident from S3 and return as base64 for Claude vision."""
+        import boto3
+        import base64
+        from sqlalchemy import select
+        from app.models.attachment import Attachment
+
+        try:
+            result = await self.db.execute(
+                select(Attachment).where(
+                    Attachment.incident_id == incident_id,
+                    Attachment.content_type.in_(["image/png", "image/jpeg", "image/gif", "image/webp"]),
+                )
+            )
+            image_attachments = result.scalars().all()
+
+            if not image_attachments:
+                return None
+
+            s3 = boto3.client(
+                "s3",
+                aws_access_key_id=getattr(settings, "AWS_ACCESS_KEY_ID", None),
+                aws_secret_access_key=getattr(settings, "AWS_SECRET_ACCESS_KEY", None),
+                region_name=getattr(settings, "AWS_REGION", "ap-south-1"),
+            )
+
+            images = []
+            for att in image_attachments[:3]:  # Max 3 images to avoid token limit
+                if att.file_size > 5 * 1024 * 1024:  # Skip images > 5MB
+                    continue
+                try:
+                    obj = s3.get_object(
+                        Bucket=getattr(settings, "S3_BUCKET_NAME", ""),
+                        Key=att.file_key,
+                    )
+                    image_bytes = obj["Body"].read()
+                    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+                    images.append({
+                        "media_type": att.content_type,
+                        "data": image_base64,
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to fetch image {att.file_name}: {e}")
+                    continue
+
+            return images if images else None
+
+        except Exception as e:
+            logger.warning(f"Failed to get incident images: {e}")
+            return None
+
+    async def _get_attachments_context(self, incident_id: UUID) -> str:
+        """Fetch attachment info and content (text, PDF, DOCX) to include in AI context."""
+        from sqlalchemy import select
+        from app.models.attachment import Attachment
+        import boto3
+
+        try:
+            result = await self.db.execute(
+                select(Attachment).where(Attachment.incident_id == incident_id)
+            )
+            attachments = result.scalars().all()
+
+            if not attachments:
+                return "No attachments."
+
+            s3 = boto3.client(
+                "s3",
+                aws_access_key_id=getattr(settings, "AWS_ACCESS_KEY_ID", None),
+                aws_secret_access_key=getattr(settings, "AWS_SECRET_ACCESS_KEY", None),
+                region_name=getattr(settings, "AWS_REGION", "ap-south-1"),
+            )
+            bucket = getattr(settings, "S3_BUCKET_NAME", "")
+
+            context_parts = []
+            for att in attachments:
+                info = f"[File: {att.file_name} ({att.content_type}, {att.file_size} bytes)]"
+
+                # Text-based files — read directly
+                text_types = ["text/plain", "text/csv", "text/x-log", "application/json"]
+                if att.content_type in text_types and att.file_size < 50000:
+                    try:
+                        obj = s3.get_object(Bucket=bucket, Key=att.file_key)
+                        content = obj["Body"].read().decode("utf-8", errors="ignore")[:5000]
+                        info += f"\nContent:\n```\n{content}\n```"
+                    except Exception:
+                        info += "\n(Could not read file content)"
+
+                # PDF files — extract text
+                elif att.content_type == "application/pdf" and att.file_size < 5000000:
+                    try:
+                        import io
+                        from PyPDF2 import PdfReader
+                        obj = s3.get_object(Bucket=bucket, Key=att.file_key)
+                        pdf_bytes = obj["Body"].read()
+                        reader = PdfReader(io.BytesIO(pdf_bytes))
+                        pdf_text = ""
+                        for page in reader.pages[:10]:  # Max 10 pages
+                            pdf_text += page.extract_text() or ""
+                        pdf_text = pdf_text[:5000]  # Limit to 5000 chars
+                        if pdf_text.strip():
+                            info += f"\nExtracted PDF Content:\n```\n{pdf_text}\n```"
+                        else:
+                            info += "\n(PDF contains no extractable text — may be scanned/image-based)"
+                    except Exception as e:
+                        info += f"\n(Could not extract PDF content: {str(e)[:50]})"
+
+                # DOCX files — extract text
+                elif att.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" and att.file_size < 5000000:
+                    try:
+                        import io
+                        from docx import Document
+                        obj = s3.get_object(Bucket=bucket, Key=att.file_key)
+                        docx_bytes = obj["Body"].read()
+                        doc = Document(io.BytesIO(docx_bytes))
+                        docx_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])[:5000]
+                        if docx_text.strip():
+                            info += f"\nExtracted DOCX Content:\n```\n{docx_text}\n```"
+                        else:
+                            info += "\n(DOCX is empty or contains only images)"
+                    except Exception as e:
+                        info += f"\n(Could not extract DOCX content: {str(e)[:50]})"
+
+                # Images — note they are attached (vision handled separately)
+                elif att.content_type.startswith("image/"):
+                    info += "\n(Image attached — will be analyzed visually if using Claude)"
+
+                context_parts.append(info)
+
+            return "\n".join(context_parts)
+
+        except Exception as e:
+            logger.warning(f"Failed to get attachments context: {e}")
+            return "Could not load attachments."
 
     def _normalize_keys(self, data) -> dict:
         """Normalize JSON keys from AI response to match expected schema.
@@ -555,8 +735,9 @@ Respond ONLY with this exact JSON structure (no other text):
         system_prompt: str,
         user_prompt: str,
         temperature: float = 0.3,
+        images: list[dict] | None = None,
     ) -> dict:
-        """Make a structured AWS Bedrock API call (JSON mode)."""
+        """Make a structured AWS Bedrock API call (JSON mode) with optional image support."""
         import boto3
 
         try:
@@ -567,13 +748,27 @@ Respond ONLY with this exact JSON structure (no other text):
                 aws_secret_access_key=getattr(settings, "AWS_SECRET_ACCESS_KEY", None),
             )
 
+            # Build content with optional images
+            content = []
+            if images:
+                for img in images:
+                    content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": img["media_type"],
+                            "data": img["data"],
+                        }
+                    })
+            content.append({"type": "text", "text": user_prompt})
+
             body = json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 2000,
                 "temperature": temperature,
                 "system": system_prompt + "\n\nYou MUST respond with valid JSON only. No other text.",
                 "messages": [
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": content}
                 ],
             })
 
@@ -603,8 +798,8 @@ Respond ONLY with this exact JSON structure (no other text):
                 detail=f"AWS Bedrock error: {str(e)}",
             )
 
-    async def _call_bedrock_chat(self, system_prompt: str, user_prompt: str) -> str:
-        """Make a plain text AWS Bedrock API call (chat mode)."""
+    async def _call_bedrock_chat(self, system_prompt: str, user_prompt: str, images: list[dict] | None = None) -> str:
+        """Make a plain text AWS Bedrock API call (chat mode) with optional image support."""
         import boto3
 
         try:
@@ -615,13 +810,31 @@ Respond ONLY with this exact JSON structure (no other text):
                 aws_secret_access_key=getattr(settings, "AWS_SECRET_ACCESS_KEY", None),
             )
 
+            # Build message content (text + optional images)
+            content = []
+
+            # Add images first if provided
+            if images:
+                for img in images:
+                    content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": img["media_type"],
+                            "data": img["data"],
+                        }
+                    })
+
+            # Add text prompt
+            content.append({"type": "text", "text": user_prompt})
+
             body = json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 1500,
+                "max_tokens": 2000,
                 "temperature": 0.5,
                 "system": system_prompt,
                 "messages": [
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": content}
                 ],
             })
 

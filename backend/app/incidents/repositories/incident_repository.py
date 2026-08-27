@@ -55,12 +55,15 @@ class IncidentRepository:
         if created_by:
             query = query.where(Incident.created_by == created_by)
         if search:
-            query = query.where(
-                or_(
-                    Incident.title.ilike(f"%{search}%"),
-                    Incident.description.ilike(f"%{search}%"),
-                )
-            )
+            search_conditions = [
+                Incident.title.ilike(f"%{search}%"),
+                Incident.description.ilike(f"%{search}%"),
+            ]
+            # If search is numeric, also match ticket number
+            search_digits = search.strip().lstrip("#")
+            if search_digits.isdigit():
+                search_conditions.append(Incident.ticket_number == int(search_digits))
+            query = query.where(or_(*search_conditions))
 
         # Count total matching records
         count_query = select(func.count()).select_from(query.subquery())

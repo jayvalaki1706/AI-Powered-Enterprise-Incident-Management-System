@@ -40,9 +40,9 @@ export default function IncidentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       setSelectedAssignee('')
-      toast.success('Incident assigned successfully')
+      toast.success('Ticket assigned successfully')
     },
-    onError: (err) => toast.error(err.response?.data?.message || err.response?.data?.detail || 'Failed to assign incident'),
+    onError: (err) => toast.error(err.response?.data?.message || err.response?.data?.detail || 'Failed to assign ticket'),
   })
 
   const selfAssignMutation = useMutation({
@@ -52,7 +52,7 @@ export default function IncidentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['incident-history', id] })
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Incident assigned to you')
+      toast.success('Ticket assigned to you')
     },
     onError: (err) => toast.error(err.response?.data?.message || err.response?.data?.detail || 'Failed to self-assign'),
   })
@@ -75,7 +75,7 @@ export default function IncidentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['sla-compliance'] })
-      toast.success('Incident updated')
+      toast.success('Ticket updated')
     },
   })
 
@@ -94,8 +94,8 @@ export default function IncidentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['sla-compliance'] })
-      toast.success('Incident deleted')
-      navigate('/incidents')
+      toast.success('Ticket deleted')
+      navigate('/tickets')
     },
     onError: (err) => toast.error(err.response?.data?.message || err.response?.data?.detail || 'Failed to delete'),
   })
@@ -107,50 +107,36 @@ export default function IncidentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['incident-history', id] })
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Incident escalated')
+      toast.success('Ticket escalated')
     },
     onError: (err) => toast.error(err.response?.data?.message || err.response?.data?.detail || 'Failed to escalate'),
   })
 
   const handleDelete = () => {
-    if (window.confirm('Are you sure you want to delete this incident? This action cannot be undone.')) {
+    if (window.confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) {
       deleteMutation.mutate()
     }
   }
 
   if (isLoading) return <Loading />
-  if (!incident) return <p className="text-center text-gray-500 py-8">Incident not found</p>
+  if (!incident) return <p className="text-center text-gray-500 py-8">Ticket not found</p>
 
   return (
-    <div className="max-w-4xl space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
+      {/* Title + Actions */}
       <div className="flex items-start justify-between">
         <div>
+          <p className="text-sm font-mono font-semibold text-gray-400 dark:text-gray-500 mb-1">#{incident.ticket_number || '—'}</p>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{incident.title}</h1>
-          <div className="flex gap-2 mt-2 items-center">
-            <select
-              value={incident.priority}
-              onChange={(e) => updateMutation.mutate({ priority: e.target.value })}
-              className="text-xs font-medium px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-            <Badge variant={incident.status}>{incident.status.replace('_', ' ')}</Badge>
-            {incident.escalation_level > 0 && <Badge variant="escalated">Level {incident.escalation_level}</Badge>}
-          </div>
+          {incident.escalation_level > 0 && (
+            <span className="inline-block mt-2 text-xs px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium">
+              Escalation Level {incident.escalation_level}
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
-          {incident.status === 'open' && (
-            <Button size="sm" onClick={() => updateMutation.mutate({ status: 'in_progress' })}>Start</Button>
-          )}
-          {incident.status === 'in_progress' && (
-            <Button size="sm" variant="success" onClick={() => updateMutation.mutate({ status: 'resolved' })}>Resolve</Button>
-          )}
-          {['ADMIN', 'INCIDENT_MANAGER', 'TEAM_LEAD'].includes(currentUser?.role) && incident.status !== 'resolved' && incident.status !== 'closed' && (
-            <Button size="sm" variant="secondary" onClick={() => escalateMutation.mutate()}>⬆ Escalate</Button>
+          {['ADMIN', 'INCIDENT_MANAGER', 'TEAM_LEAD'].includes(currentUser?.role) && incident.status !== 'closed' && (
+            <Button size="sm" variant="secondary" onClick={() => escalateMutation.mutate()}>Escalate</Button>
           )}
           {currentUser?.role === 'ADMIN' && (
             <Button size="sm" variant="danger" onClick={handleDelete} loading={deleteMutation.isPending}>Delete</Button>
@@ -158,120 +144,170 @@ export default function IncidentDetailPage() {
         </div>
       </div>
 
-      {/* SLA Timer */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-1">
-          <SLATimer deadline={incident.sla_deadline} status={incident.status} />
+      {/* SLA & Timeline - Horizontal Bar */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+          <div>
+            <SLATimer deadline={incident.sla_deadline} status={incident.status} />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">SLA Deadline</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">
+              {incident.sla_deadline ? formatDate(incident.sla_deadline) : 'N/A'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Created</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">{formatDate(incident.created_at)}</p>
+          </div>
+          <div>
+            {incident.resolved_at ? (
+              <>
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Resolved</p>
+                <p className="text-sm font-medium text-green-600 dark:text-green-400 mt-0.5">{formatDate(incident.resolved_at)}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Resolved</p>
+                <p className="text-sm text-gray-400 mt-0.5">—</p>
+              </>
+            )}
+          </div>
         </div>
-        <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <div className="grid grid-cols-2 gap-3 text-sm">
+      </div>
+
+      {/* Main Content + Right Sidebar (Freshservice style) */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Left: Description, Comments, Files, History */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Description */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Description</h2>
+            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{incident.description}</p>
+          </div>
+
+          {/* Comments */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Comments ({comments.length})</h2>
+            <form onSubmit={(e) => { e.preventDefault(); if (comment.trim()) commentMutation.mutate({ content: comment }) }} className="flex gap-3 mb-5">
+              <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {currentUser?.full_name?.[0]?.toUpperCase()}
+              </div>
+              <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Write a comment..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <Button type="submit" size="sm" loading={commentMutation.isPending}>Post</Button>
+            </form>
+            <div className="space-y-4">
+              {comments.map((c) => (
+                <div key={c.id} className="flex gap-3">
+                  <div className="h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-gray-700 dark:text-gray-200 text-xs font-bold shrink-0">
+                    {c.user_name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{c.user_name || 'Unknown'}</span>
+                      <span className="text-xs text-gray-400">{formatDate(c.created_at)}</span>
+                    </div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{c.content}</p>
+                  </div>
+                </div>
+              ))}
+              {comments.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No comments yet. Be the first to comment.</p>}
+            </div>
+          </div>
+
+          {/* File Attachments */}
+          <FileUpload incidentId={id} />
+
+          {/* History */}
+          {history.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+              <h2 className="font-semibold text-gray-900 dark:text-white mb-4">History</h2>
+              <div className="space-y-2">
+                {history.map((h) => {
+                  const resolveValue = (field, value) => {
+                    if (!value || value === '—') return '—'
+                    if (field === 'assigned_to') {
+                      const user = users.find((u) => u.id === value)
+                      return user ? user.full_name : value
+                    }
+                    return value
+                  }
+                  return (
+                    <div key={h.id} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                      <span className="text-xs text-gray-400 w-36">{formatDate(h.created_at)}</span>
+                      <span><strong>{h.field_changed}</strong>: {resolveValue(h.field_changed, h.old_value)} → {resolveValue(h.field_changed, h.new_value)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Sidebar: Properties (Freshservice style) */}
+        <div className="lg:col-span-1">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-5 lg:sticky lg:top-6">
+            {/* Status */}
             <div>
-              <p className="text-gray-500 dark:text-gray-400">SLA Deadline</p>
-              <p className="font-medium text-gray-900 dark:text-white">
-                {incident.sla_deadline ? formatDate(incident.sla_deadline) : 'N/A'}
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</label>
+              <select
+                value={incident.status}
+                onChange={(e) => updateMutation.mutate({ status: e.target.value })}
+                className="mt-1.5 w-full text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="pending">Pending</option>
+                <option value="hold">Hold</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+
+            {/* Severity */}
+            <div>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Severity</label>
+              <select
+                value={incident.priority}
+                onChange={(e) => updateMutation.mutate({ priority: e.target.value })}
+                className="mt-1.5 w-full text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+
+            <hr className="border-gray-100 dark:border-gray-700" />
+
+            {/* Assignment */}
+            <div>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Assigned To</label>
+              <select
+                value={incident.assigned_to || ''}
+                onChange={(e) => { if (e.target.value) assignMutation.mutate(e.target.value) }}
+                className="mt-1.5 w-full text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="">Unassigned</option>
+                {users.filter((u) => u.role !== 'CUSTOMER').map((u) => (
+                  <option key={u.id} value={u.id}>{u.full_name} ({u.role.replace('_', ' ')})</option>
+                ))}
+              </select>
+            </div>
+
+            <hr className="border-gray-100 dark:border-gray-700" />
+
+            {/* Created By */}
+            <div>
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Created By</label>
+              <p className="mt-1.5 text-sm font-medium text-gray-900 dark:text-white">
+                {users.find((u) => u.id === incident.created_by)?.full_name || 'Unknown'}
               </p>
             </div>
-            <div>
-              <p className="text-gray-500 dark:text-gray-400">Created</p>
-              <p className="font-medium text-gray-900 dark:text-white">{formatDate(incident.created_at)}</p>
-            </div>
-            {incident.resolved_at && (
-              <div>
-                <p className="text-gray-500 dark:text-gray-400">Resolved</p>
-                <p className="font-medium text-green-600 dark:text-green-400">{formatDate(incident.resolved_at)}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-gray-500 dark:text-gray-400">Escalation Level</p>
-              <p className="font-medium text-gray-900 dark:text-white">{incident.escalation_level}</p>
-            </div>
           </div>
         </div>
       </div>
-
-      {/* Assignment */}
-      {(canAssign) && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Assignment</h2>
-          <div className="space-y-3">
-            {incident.assigned_to && (
-              <div className="text-sm">
-                <span className="text-gray-500 dark:text-gray-400">Current Assignee: </span>
-                <span className="font-medium text-blue-600 dark:text-blue-400">
-                  {incident.assigned_to === currentUser?.id
-                    ? '👤 You'
-                    : users.find((u) => u.id === incident.assigned_to)?.full_name || 'Assigned'}
-                </span>
-              </div>
-            )}
-            {!incident.assigned_to && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No assignee</p>
-            )}
-
-            {/* Searchable assignment */}
-            <AssigneeDropdown
-              users={users.filter((u) => u.role !== 'CUSTOMER')}
-              selectedAssignee={selectedAssignee}
-              onSelect={(id) => setSelectedAssignee(id)}
-              onAssign={() => { if (selectedAssignee) assignMutation.mutate(selectedAssignee) }}
-              loading={assignMutation.isPending}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Details */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-        <h2 className="font-semibold text-gray-900 dark:text-white mb-2">Description</h2>
-        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{incident.description}</p>
-      </div>
-
-      {/* Comments */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-        <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Comments ({comments.length})</h2>
-        <form onSubmit={(e) => { e.preventDefault(); if (comment.trim()) commentMutation.mutate({ content: comment }) }} className="flex gap-2 mb-4">
-          <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-          <Button type="submit" size="sm" loading={commentMutation.isPending}>Post</Button>
-        </form>
-        <div className="space-y-3">
-          {comments.map((c) => (
-            <div key={c.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p className="text-sm text-gray-800 dark:text-gray-200">{c.content}</p>
-              <p className="text-xs text-gray-500 mt-1">{formatDate(c.created_at)}</p>
-            </div>
-          ))}
-          {comments.length === 0 && <p className="text-sm text-gray-500">No comments yet</p>}
-        </div>
-      </div>
-
-      {/* File Attachments */}
-      <FileUpload incidentId={id} />
-
-      {/* History */}
-      {history.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-4">History</h2>
-          <div className="space-y-2">
-            {history.map((h) => {
-              const resolveValue = (field, value) => {
-                if (!value || value === '—') return '—'
-                if (field === 'assigned_to') {
-                  const user = users.find((u) => u.id === value)
-                  return user ? user.full_name : value
-                }
-                return value
-              }
-              return (
-                <div key={h.id} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                  <span className="text-xs text-gray-400 w-36">{formatDate(h.created_at)}</span>
-                  <span><strong>{h.field_changed}</strong>: {resolveValue(h.field_changed, h.old_value)} → {resolveValue(h.field_changed, h.new_value)}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

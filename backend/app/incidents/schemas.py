@@ -30,6 +30,7 @@ class CommentCreate(BaseModel):
 
 class IncidentResponse(BaseModel):
     id: UUID
+    ticket_number: int | None = None
     title: str
     description: str
     priority: IncidentPriority
@@ -51,6 +52,7 @@ class CommentResponse(BaseModel):
     id: UUID
     incident_id: UUID
     user_id: UUID
+    user_name: str | None = None
     content: str
     created_at: datetime
 

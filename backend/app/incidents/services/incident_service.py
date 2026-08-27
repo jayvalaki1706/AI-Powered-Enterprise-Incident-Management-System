@@ -97,12 +97,12 @@ class IncidentService:
 
             setattr(incident, field, new_value)
 
-        # Auto-set resolved_at when status changes to RESOLVED
-        if data.status == IncidentStatus.RESOLVED and incident.resolved_at is None:
+        # Auto-set resolved_at when status changes to CLOSED
+        if data.status == IncidentStatus.CLOSED and incident.resolved_at is None:
             incident.resolved_at = datetime.utcnow()
 
         # Clear resolved_at if re-opened
-        if data.status in (IncidentStatus.OPEN, IncidentStatus.IN_PROGRESS):
+        if data.status in (IncidentStatus.OPEN, IncidentStatus.IN_PROGRESS, IncidentStatus.PENDING, IncidentStatus.HOLD):
             incident.resolved_at = None
 
         return await self.repository.update(incident)

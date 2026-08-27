@@ -331,7 +331,6 @@ async def add_comment(
 
 @router.get(
     "/{incident_id}/comments",
-    response_model=list[CommentResponse],
     summary="Get all comments for an incident",
 )
 async def get_comments(
@@ -340,7 +339,25 @@ async def get_comments(
     current_user: User = Depends(get_current_user),
 ):
     service = IncidentService(db)
-    return await service.get_comments(incident_id)
+    comments = await service.get_comments(incident_id)
+
+    # Resolve user names
+    from app.auth.repositories.user_repository import UserRepository
+    user_repo = UserRepository(db)
+    all_users = await user_repo.get_all(skip=0, limit=500)
+    user_map = {user.id: user.full_name for user in all_users}
+
+    return [
+        {
+            "id": c.id,
+            "incident_id": c.incident_id,
+            "user_id": c.user_id,
+            "user_name": user_map.get(c.user_id, "Unknown"),
+            "content": c.content,
+            "created_at": c.created_at,
+        }
+        for c in comments
+    ]
 
 
 # ─── History ────────────────────────────────────────────────────────────────────

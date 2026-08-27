@@ -7,7 +7,7 @@ import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
 
 const RESOURCE_TYPES = [
   { value: '', label: 'All Resources' },
-  { value: 'incident', label: 'Incident' },
+  { value: 'incident', label: 'Ticket' },
   { value: 'user', label: 'User' },
   { value: 'team', label: 'Team' },
   { value: 'comment', label: 'Comment' },

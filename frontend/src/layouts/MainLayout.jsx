@@ -7,7 +7,7 @@ import NotificationBell from '../components/notifications/NotificationBell'
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-  { path: '/incidents', label: 'Incidents', icon: ExclamationTriangleIcon },
+  { path: '/tickets', label: 'Tickets', icon: ExclamationTriangleIcon },
   { path: '/ai-assistant', label: 'AI Assistant', icon: SparklesIcon, roles: ['ADMIN', 'INCIDENT_MANAGER', 'TEAM_LEAD', 'ENGINEER'] },
   { path: '/admin', label: 'Admin', icon: CogIcon, roles: ['ADMIN', 'INCIDENT_MANAGER'] },
   { path: '/teams', label: 'Teams', icon: UserGroupIcon, roles: ['ADMIN', 'INCIDENT_MANAGER'] },
@@ -65,7 +65,7 @@ export default function MainLayout() {
         >
           <Bars3Icon className="h-6 w-6" />
         </button>
-        <h1 className="text-lg font-bold text-gray-900 dark:text-white">🚨 IncidentMgmt</h1>
+        <h1 className="text-lg font-bold text-gray-900 dark:text-white">⚡ ResolvIQ</h1>
         <NotificationBell />
       </div>
 
@@ -84,7 +84,7 @@ export default function MainLayout() {
         <div className="flex flex-col h-full">
           {/* Logo + Close button on mobile */}
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">🚨 IncidentMgmt</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">⚡ ResolvIQ</h1>
             <button
               onClick={() => setSidebarOpen(false)}
               className="md:hidden p-1 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"

@@ -24,7 +24,6 @@ export default function AIAssistantPage() {
           <span className="text-2xl">🤖</span>
           <div>
             <h1 className="text-lg font-bold">AI Assistant</h1>
-            <p className="text-xs text-white/70">Powered by Ollama - runs locally, free of cost</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -168,7 +167,7 @@ function SOPTab() {
 function RCATab() {
   return <IncidentActionTab endpoint="/ai/generate-rca" title="Root Cause Analysis" renderResult={(r) => (
     <div className="space-y-4">
-      <ResultSection title="Incident" content={r.incident_title} />
+      <ResultSection title="Ticket" content={r.incident_title} />
       <ResultSection title="Summary" content={r.summary} />
       <ResultSection title="Root Cause" content={r.root_cause} />
       <ResultList title="Contributing Factors" items={r.contributing_factors} />
@@ -262,7 +261,7 @@ function ChatTab() {
           onChange={(e) => setIncidentId(e.target.value)}
           className="ml-auto text-xs px-2 py-1 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         >
-          <option value="">No incident context</option>
+          <option value="">No ticket context</option>
           {incidents?.map((inc) => (
             <option key={inc.id} value={inc.id}>{inc.title}</option>
           ))}
@@ -274,8 +273,8 @@ function ChatTab() {
         {messages.length === 0 && (
           <div className="text-center text-gray-400 dark:text-gray-500 py-12">
             <p className="text-3xl mb-2">🤖</p>
-            <p>Ask me anything about incidents, logs, or troubleshooting.</p>
-            <p className="text-xs mt-1">Select an incident for contextual answers.</p>
+            <p>Ask me anything about tickets, logs, or troubleshooting.</p>
+            <p className="text-xs mt-1">Select a ticket for contextual answers.</p>
           </div>
         )}
         {messages.map((msg, idx) => (
@@ -305,7 +304,7 @@ function ChatTab() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-            placeholder="Ask about an incident, paste logs, or ask for help... (Enter to send, Shift+Enter for new line)"
+            placeholder="Ask about a ticket, paste logs, or ask for help... (Enter to send, Shift+Enter for new line)"
             rows={2}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
@@ -373,13 +372,13 @@ function IncidentActionTab({ endpoint, title, renderResult }) {
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
         <h2 className="font-semibold text-gray-900 dark:text-white mb-3">{title}</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Select an incident to generate AI-powered analysis.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Select a ticket to generate AI-powered analysis.</p>
         <select
           value={incidentId}
           onChange={(e) => setIncidentId(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-3"
         >
-          <option value="">Select an incident...</option>
+          <option value="">Select a ticket...</option>
           {incidents?.map((inc) => (
             <option key={inc.id} value={inc.id}>[{inc.priority}] {inc.title}</option>
           ))}
@@ -397,7 +396,7 @@ function IncidentActionTab({ endpoint, title, renderResult }) {
         )}
       </div>
 
-      {mutation.isPending && <LoadingCard text="AI is analyzing the incident..." />}
+      {mutation.isPending && <LoadingCard text="AI is analyzing the ticket..." />}
 
       {result && (
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">

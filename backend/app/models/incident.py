@@ -17,7 +17,8 @@ class IncidentPriority(str, enum.Enum):
 class IncidentStatus(str, enum.Enum):
     OPEN = "open"
     IN_PROGRESS = "in_progress"
-    RESOLVED = "resolved"
+    PENDING = "pending"
+    HOLD = "hold"
     CLOSED = "closed"
     ESCALATED = "escalated"
 
@@ -27,6 +28,9 @@ class Incident(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    ticket_number: Mapped[int] = mapped_column(
+        Integer, autoincrement=True, unique=True, index=True, nullable=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)

@@ -43,6 +43,13 @@ ALLOWED_CONTENT_TYPES = {
     "text/plain",
     "text/csv",
     "application/json",
+    # Microsoft Office
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # .docx
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # .xlsx
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",  # .pptx
+    "application/msword",  # .doc
+    "application/vnd.ms-excel",  # .xls
+    "application/vnd.ms-powerpoint",  # .ppt
     # Logs
     "text/x-log",
     "application/octet-stream",

@@ -26,7 +26,7 @@ class AnalyticsRepository:
             func.count(Incident.id).label("total"),
             func.count(case((Incident.status == IncidentStatus.OPEN, 1))).label("open"),
             func.count(case((Incident.status == IncidentStatus.IN_PROGRESS, 1))).label("in_progress"),
-            func.count(case((Incident.status == IncidentStatus.RESOLVED, 1))).label("resolved"),
+            func.count(case((Incident.status == IncidentStatus.CLOSED, 1))).label("resolved"),
             func.count(case((Incident.status == IncidentStatus.CLOSED, 1))).label("closed"),
             func.count(case((Incident.status == IncidentStatus.ESCALATED, 1))).label("escalated"),
             func.count(case((Incident.priority == IncidentPriority.CRITICAL, 1))).label("critical"),

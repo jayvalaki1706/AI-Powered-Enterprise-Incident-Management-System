@@ -25,7 +25,7 @@ export default function SLATimer({ deadline, status }) {
     return (
       <div className="flex items-center gap-2">
         <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-        <span className="text-sm font-medium text-green-600 dark:text-green-400">Completed</span>
+        <span className="text-sm font-medium text-green-600 dark:text-green-400">Resolved — SLA Met</span>
       </div>
     )
   }

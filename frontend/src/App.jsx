@@ -31,8 +31,8 @@ function App() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/incidents" element={<IncidentListPage />} />
-          <Route path="/incidents/:id" element={<IncidentDetailPage />} />
+          <Route path="/tickets" element={<IncidentListPage />} />
+          <Route path="/tickets/:id" element={<IncidentDetailPage />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/audit-logs" element={<AuditLogsPage />} />
