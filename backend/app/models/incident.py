@@ -1,7 +1,7 @@
 import uuid
 import enum
 from datetime import datetime
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Enum as SQLEnum, Sequence, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.database import Base
@@ -30,7 +30,12 @@ class Incident(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     ticket_number: Mapped[int] = mapped_column(
-        Integer, autoincrement=True, unique=True, index=True, nullable=True
+        Integer,
+        Sequence("incident_ticket_number_seq", start=1000),
+        server_default=text("nextval('incident_ticket_number_seq')"),
+        unique=True,
+        index=True,
+        nullable=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
