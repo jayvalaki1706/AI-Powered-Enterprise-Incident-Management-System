@@ -33,8 +33,9 @@ export default function IncidentDetailPage() {
   })
 
   const assignMutation = useMutation({
-    mutationFn: (assigneeId) => api.post(`/incidents/${id}/assign/${assigneeId}`),
-    onSuccess: () => {
+    mutationFn: (assigneeId) => api.post(`/incidents/${id}/assign/${assigneeId}`).then((r) => r.data),
+    onSuccess: (updatedIncident) => {
+      queryClient.setQueryData(['incident', id], updatedIncident)
       queryClient.invalidateQueries({ queryKey: ['incident', id] })
       queryClient.invalidateQueries({ queryKey: ['incident-history', id] })
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
@@ -68,8 +69,10 @@ export default function IncidentDetailPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data) => api.patch(`/incidents/${id}`, data),
-    onSuccess: () => {
+    mutationFn: (data) => api.patch(`/incidents/${id}`, data).then((r) => r.data),
+    onSuccess: (updatedIncident) => {
+      // Immediately update the cache with the fresh data from the server
+      queryClient.setQueryData(['incident', id], updatedIncident)
       queryClient.invalidateQueries({ queryKey: ['incident', id] })
       queryClient.invalidateQueries({ queryKey: ['incident-history', id] })
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
@@ -77,6 +80,7 @@ export default function IncidentDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['sla-compliance'] })
       toast.success('Ticket updated')
     },
+    onError: (err) => toast.error(err.response?.data?.message || err.response?.data?.detail || 'Failed to update'),
   })
 
   const commentMutation = useMutation({
