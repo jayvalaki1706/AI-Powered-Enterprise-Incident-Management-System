@@ -1,20 +1,43 @@
-# 🚨 Enterprise Incident Management System
+# ⚡ ResolvIQ — AI-Powered Enterprise Incident Management
 
-> AI-powered incident management platform with real-time SLA monitoring, automated RCA generation, and intelligent log analysis.
+> Intelligent incident & ticket management platform with LLM-powered root cause analysis, SOP generation, log analysis, and real-time SLA monitoring. Built with FastAPI + React, powered by AWS Bedrock (Claude 3.5 Sonnet).
 
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![AWS Bedrock](https://img.shields.io/badge/AWS_Bedrock-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
+![Claude](https://img.shields.io/badge/Claude_3.5-D97757?style=for-the-badge&logo=anthropic&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+
+---
+
+## 🤖 AI Engineering Highlights
+
+This project demonstrates hands-on, production-grade AI engineering across the full stack:
+
+| Competency | How It's Demonstrated in This Project |
+|-----------|----------------------------------------|
+| **Python & Software Engineering** | Async FastAPI backend built with clean architecture — repository pattern, service layer, dependency injection, Pydantic v2 validation, and SQLAlchemy 2.0 ORM. |
+| **AI Applications with FastAPI** | RESTful microservice endpoints for AI features (log analysis, RCA, SOP, chat) with streaming-ready async handlers, retry logic, and graceful error handling. |
+| **LLMs & Generative AI** | Integrated **Claude 3.5 Sonnet via AWS Bedrock** for multi-modal reasoning — text + vision (analyzing uploaded screenshots, PDFs, and logs). Pluggable provider design supporting both cloud (Bedrock) and local (Ollama) inference. |
+| **Prompt Engineering** | Structured system prompts with role-specific instructions, JSON-schema-enforced outputs, and response normalization to handle model output variability. Few-shot style guidance for RCA (5-Whys), SOP generation, and log triage. |
+| **Multi-Modal AI** | Vision-enabled analysis — feeds base64-encoded images and extracted document text (PDF/DOCX) into the LLM context for richer incident understanding. |
+| **AI Guardrails & Governance** | Role-based access control on AI features, input size limits, content truncation, output validation, and provider-level fallback to prevent failures. |
+| **AWS Services** | **Bedrock** (LLM inference), **EC2** (compute), **RDS PostgreSQL** (managed DB), **S3** (file storage & attachments), **SES** (email), **IAM** (access control), **CloudWatch**-ready logging. |
+| **Enterprise Integration** | AI layer integrated with PostgreSQL data, S3 document store, incident history, and comment threads — persisting all AI interactions per ticket for auditability. |
+| **Containerization & CI/CD** | Fully Dockerized (multi-stage builds), orchestrated with Docker Compose, GitHub Actions CI/CD pipeline, deployed to AWS. |
+| **System Design & Scalability** | Redis caching (30s TTL with invalidation), RabbitMQ + Celery for async task processing, token-bucket rate limiting, connection pooling, and horizontal-scaling-ready worker architecture. Load-tested with Locust. |
+
+**Roadmap (in progress):** RAG-based knowledge retrieval over historical incidents using vector embeddings; agentic multi-step incident resolution with LangGraph orchestration.
 
 ---
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [AI Capabilities](#ai-capabilities)
 - [Architecture](#architecture)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -23,6 +46,21 @@
 - [API Documentation](#api-documentation)
 - [Deployment](#deployment)
 - [Project Structure](#project-structure)
+
+---
+
+## AI Capabilities
+
+The AI engine (AWS Bedrock / Claude 3.5 Sonnet, with local Ollama fallback) powers:
+
+| Feature | Description |
+|---------|-------------|
+| **Log Analysis** | Paste raw logs → AI identifies root cause, severity, affected components, and step-by-step fixes with actual commands. |
+| **Root Cause Analysis (RCA)** | Generates structured 5-Whys RCA reports with contributing factors, timeline, corrective & preventive actions. |
+| **SOP Generation** | Produces detailed Standard Operating Procedures with prerequisites, step-by-step commands, escalation criteria, and rollback procedures. |
+| **Resolution Suggestions** | AI-recommended fixes with specific commands, config changes, and effort estimates. |
+| **Contextual Chat** | Multi-turn chat with full ticket context — reads description, comments, attachments (text, PDF, DOCX), and images (vision). Conversations persisted per ticket. |
+| **Multi-Modal Understanding** | Analyzes uploaded screenshots (vision), extracts text from PDF/DOCX, and reads log files for complete incident context. |
 
 ---
 
